@@ -31,6 +31,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt -r requirements-test.txt
+          
+      - name: Make ../data symlink for tests
+        run: ln -s "$PWD/data" ../data || true
 
       - name: Run model tests
         run: make model-test
