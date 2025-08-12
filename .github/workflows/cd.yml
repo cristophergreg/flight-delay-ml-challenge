@@ -60,4 +60,4 @@ jobs:
 
       - name: Note skipped deploy
         if: steps.gate.outputs.deploy != 'true'
-        run: echo "CD skipped: missing GCP secrets."
+        run: echo "CD skipped missing GCP secrets."
