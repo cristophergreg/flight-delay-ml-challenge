@@ -1,4 +1,4 @@
-name: 'Continuous Delivery'
+name: CD
 
 on:
   push:
@@ -10,34 +10,51 @@ env:
 
 jobs:
   deploy:
-    # Skip deploy if GCP secrets are missing (prevents failures without billing)
-    env:
-      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-      GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
-    if: ${{ env.GCP_PROJECT_ID != '' && env.GCP_SA_KEY != '' }}
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Gate: check required secrets; expose them as env only in this step
+      - name: Gate deploy (check secrets)
+        id: gate
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+        run: |
+          if [ -z "$GCP_PROJECT_ID" ] || [ -z "$GCP_SA_KEY" ]; then
+            echo "deploy=false" >> $GITHUB_OUTPUT
+            echo "CD skipped: missing GCP secrets."
+          else
+            echo "deploy=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Auth to Google Cloud
+        if: steps.gate.outputs.deploy == 'true'
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ env.GCP_SA_KEY }}
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
 
       - name: Setup gcloud
+        if: steps.gate.outputs.deploy == 'true'
         uses: google-github-actions/setup-gcloud@v2
 
       - name: Configure gcloud project
-        run: gcloud config set project ${{ env.GCP_PROJECT_ID }}
+        if: steps.gate.outputs.deploy == 'true'
+        run: gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
 
       - name: Build image with Cloud Build
-        run: gcloud builds submit --tag gcr.io/${{ env.GCP_PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+        if: steps.gate.outputs.deploy == 'true'
+        run: gcloud builds submit --tag gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
 
       - name: Deploy to Cloud Run
+        if: steps.gate.outputs.deploy == 'true'
         run: |
           gcloud run deploy ${{ env.SERVICE_NAME }} \
-            --image gcr.io/${{ env.GCP_PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
+            --image gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
             --region ${{ env.REGION }} --platform managed \
             --allow-unauthenticated --port 8080
+
+      - name: Note skipped deploy
+        if: steps.gate.outputs.deploy != 'true'
+        run: echo "CD skipped: missing GCP secrets."
