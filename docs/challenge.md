@@ -281,3 +281,39 @@ make stress-test
 ```
 
 ---
+
+## CI/CD
+
+### Continuous Integration (CI)
+- Workflow: `.github/workflows/ci.yml`
+- Triggers: pull requests targeting `develop` and pushes to `develop`/`main`.
+- Steps:
+  - Setup Python 3.10 and cache pip.
+  - Install dependencies from `requirements.txt` and `requirements-test.txt`.
+  - Run unit tests via `make model-test` and `make api-test`.
+  - Publish test reports from the `reports/` folder as GitHub Actions artifacts.
+
+---
+
+### Continuous Delivery (CD) – Cloud Run (guarded)
+- Workflow: `.github/workflows/cd.yml`
+- Trigger: push to `main`.
+- The `deploy` job is **guarded** and will **skip** automatically unless both secrets are present:
+  - `GCP_PROJECT_ID`
+  - `GCP_SA_KEY` (Service Account JSON with roles: Cloud Run Admin, Cloud Build Editor, Artifact Registry Writer and Service Account User).
+- When secrets and billing are available, the pipeline:
+  1. Authenticates to Google Cloud.
+  2. Builds the container image with Cloud Build.
+  3. Deploys the service to Cloud Run (`--allow-unauthenticated`, `--port 8080`).
+
+---
+
+### Local run (for reviewers)
+The service can be run locally using Docker:
+```bash
+docker build -t flight-delay-api .
+docker run --rm -p 8080:8080 -e PORT=8080 flight-delay-api
+curl http://localhost:8080/health
+```
+
+> **Note:**Deployment note: Public cloud deployment is gated by billing/secrets. The CD workflow is in place and ready to be activated when infrastructure is available.
