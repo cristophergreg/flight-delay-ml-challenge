@@ -1,4 +1,6 @@
 fastapi~=0.86.0
+# Compatibility pin: FastAPI 0.86 / Starlette expect anyio 3.x; anyio 4.x breaks TestClient
+anyio<4
 pydantic~=1.10.2
 uvicorn~=0.15.0
 numpy~=1.22.4
